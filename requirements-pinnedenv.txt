@@ -1,0 +1,16 @@
+# Pinned environment for stages 1-3 (scripts/pinned_env.py) and for
+# reproducing earlier runs. Must be UTF-8: pip cannot read UTF-16.
+# numpy < 2.2 and pandas < 3.0 are what reproduce the January 2026 results.
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.6.1
+scipy==1.16.3
+tsfresh==0.21.1
+pyyaml
+openpyxl
+pyarrow
+shap
+tqdm
+statsmodels==0.15.0
+matplotlib==3.11.2
+seaborn==0.13.2

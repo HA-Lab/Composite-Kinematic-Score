@@ -1,0 +1,257 @@
+# =============================================================================
+# GAIT RECOVERY PIPELINE - CONFIGURATION TEMPLATE
+# =============================================================================
+# Copy this file (e.g. to config.yaml), fill in SECTION A below, and pass its
+# path to the pipeline entry point. SECTION B has working defaults for most
+# labs, but edit if needed.
+# =============================================================================
+
+
+# #############################################################################
+# SECTION A - SET THESE
+# #############################################################################
+
+# -----------------------------------------------------------------------------
+# Project paths
+# -----------------------------------------------------------------------------
+paths:
+  # Root folder containing your data/, animal key file, and where outputs/
+  # will be created. On Colab this is typically a Google Drive path.
+  # Leave null to use the folder this pipeline lives in -- correct for both a
+  # local clone and a Drive folder on Colab. Set an absolute path only if the
+  # data lives somewhere else.
+  project_root: null
+  # project_root: "."  # optional, if downloading locally and running from project root folder
+
+  # Subfolder (relative to project_root) containing the raw MotoRater .xlsx files.
+  data_subdir: "data"                                            # required
+
+  # Path to the animal/session key file (relative to project_root).
+  animal_key_file: "animal_data_key.xlsx"                        # required
+
+  # Where all pipeline outputs get written (relative to project_root).
+  # Subfolder structure (extraction_cache/, recovery_scores/, etc.) is created
+  # automatically underneath this.
+  output_subdir: "outputs"                                       # required
+
+
+# -----------------------------------------------------------------------------
+# Animal key schema mapping
+# -----------------------------------------------------------------------------
+# Tell the pipeline which column in your key file corresponds to each concept.
+#
+# required: animal_id_col, timepoint_days_col, filename_col.
+# Optional: set to null if it doesn't apply - the pipeline falls back to a
+# single implicit group/run and skips any analysis step that requires
+# the missing field (with a warning).
+schema_mapping:
+  animal_id_col: "Animal ID"              # required
+  timepoint_days_col: "Timepoint (days)"  # required, unless injury_status_col (below) is set instead
+  filename_col: "FileName"                # required (links key rows to .xlsx files)
+
+  treatment_group_col: "Treatment Groups" # optional - null => single implicit group, "AllAnimals"
+  run_number_col: "Trial"                 # optional - null => run number parsed from filename only
+  condition_col: "Condition"              # optional - informational only, not used in analysis logic
+  date_code_col: null                     # optional - null => date code parsed from filename only
+
+  # Value in timepoint_days_col that represents the pre-injury / uninjured
+  # baseline. Almost always 0, but configurable in case a lab encodes it
+  # differently (e.g. -1, or a string like "PreSCI").
+  baseline_timepoint_value: 0             # required
+
+  # Advanced - leave these as null unless design needs them.
+  # By default, injury status ("baseline/healthy" vs. "injured") is inferred
+  # from timepoint_days, which covers within-subject longitudinal design
+  # (the same animals scanned over time). If design doesn't map
+  # injury status onto timepoint this way (e.g. separate healthy-control
+  # and injured animals scanned at the same single timepoint, with no
+  # baseline scan for the injured animals at all) set injury_status_col to
+  # a column that labels each row's status directly, plus the two label
+  # values it uses. This then takes over from timepoint_days for
+  # determining baseline vs. injured everywhere that distinction is used
+  # (Stage 1 injury relevance, all 4 Stage 3 recovery metrics).
+  #
+  # If your data has no real time axis at all (e.g. one scan per animal,
+  # healthy vs. injured, never repeated over time), you can leave
+  # timepoint_days_col unset entirely as long as injury_status_col is set —
+  # Stage 1 and Stage 3 will run normally off injury_status_col alone. 
+  # Stage 2 (ANOVA-slope feature selection) and Stage 4 (recovery
+  # curves/statistics) are inherently about change over time, so they'll
+  # detect there's no time axis and skip with a stated reason.
+  injury_status_col: null                 # optional - e.g. "Group" or "Status"
+  injury_status_baseline_label: null      # optional - value meaning "baseline/healthy", e.g. "Sham"
+  injury_status_injured_label: null       # optional - value meaning "injured reference", e.g. "SCI"
+
+
+# -----------------------------------------------------------------------------
+# Reference groups / timepoints (drives scenario detection + metric anchoring)
+# -----------------------------------------------------------------------------
+reference:
+  # Timepoint (in days) used as the "acute injury" reference for relevance
+  # testing and metric normalization (CKS/Mahalanobis/kNN/Ridge anchor point).
+  # Set to null to auto-use the earliest post-baseline timepoint present.
+  injury_reference_timepoint: 7                          # optional (default: earliest post-baseline tp)
+
+  # Treatment-group label to use as the "untreated / reference" arm when
+  # comparing against treated groups. Set to null if there is no such group
+  # (e.g. only one group, or no treatment_group_col at all) - the pipeline
+  # then uses ALL animals at injury_reference_timepoint as the injured reference.
+  reference_group: "Vehicle"                             # optional
+
+  # Force the detected data scenario instead of letting the profiler infer it.
+  # Options: null (auto-detect), "baseline_only", "injured_only",
+  # "longitudinal_single_group", "longitudinal_multi_group". If set and it disagrees with
+  # auto-detection, the pipeline prints a warning showing both and proceeds
+  # with this override.
+  scenario_override: null                                # optional
+
+
+# -----------------------------------------------------------------------------
+# Feature selection toggle
+# -----------------------------------------------------------------------------
+transform_select:
+  # If false, all transformed/scaled features pass through untouched and the
+  # ANOVA-slope selection step is skipped. Also auto-skipped regardless of
+  # this flag if treatment_group_col is null or has fewer than 2 groups
+  # present (a warning explains why).
+  run_feature_selection: true             # optional (default: true)
+
+
+# -----------------------------------------------------------------------------
+# Reproducibility (optional)
+# -----------------------------------------------------------------------------
+reproducibility:
+  # Use frozen Yeo-Johnson lambda values (from fixed_lambdas.json) instead of
+  # re-fitting lambda fresh on each run. Gives modest additional tightening
+  # of cross-environment agreement. Matters if need to exactly reproduce a specific 
+  # prior run.
+  use_fixed_lambdas: true                                 # default: true
+  fixed_lambdas_file: "fixed_lambdas.json"                # default shown
+
+  # Run Stage 1-3 in a separate pinned Python 3.12 / package version fixed environment
+  # instead of the notebook's own kernel. Does not guarantee closer agreement across 
+  # environments (for ex. with different OS), but can be useful for
+  # standardizing exactly which package versions a run used.
+  use_pinned_versions: false                              # default: false
+  pinned_requirements_file: "requirements.txt"            # default shown
+
+  # Forces single-threaded BLAS (OMP/MKL/OPENBLAS_NUM_THREADS=1) to reduce
+  # thread-count-dependent floating-point noise in PCA/Ridge. Small speed
+  # cost, negligible given typical matrix sizes here.
+  force_single_threaded_blas: true                        # default: true
+
+
+# #############################################################################
+# SECTION B - ADVANCED (defaults work for most cases)
+# #############################################################################
+
+# -----------------------------------------------------------------------------
+# Filename parsing
+# -----------------------------------------------------------------------------
+# Governs how Script 1 parses each Excel filename as a fallback / cross-check
+# against the animal key. Default matches:
+# [DateCode]_[AnimalID]_[XDPI]_[RunNumber]_out.xlsx
+filename_parsing:
+  delimiter: "_"                                              # default: "_"
+  field_order: ["date_code", "animal_id", "timepoint_label", "run_number"]  # default shown
+
+
+# -----------------------------------------------------------------------------
+# Script 1 - Feature extraction (TSFresh)
+# -----------------------------------------------------------------------------
+extraction:
+  n_jobs: "auto"          # resolves to all available cores at runtime
+  n_io_workers: "auto"    # thread count for reading Excel files; "auto" = min(32, cores*4)
+
+  # Two-stage relevance filtering (injury relevance + treatment relevance).
+  # Set to false to skip straight to "keep everything TSFresh extracted"
+  # (useful for injured_only/baseline_only/single_group data where one or
+  # both relevance stages can't be computed anyway).
+  run_relevance_filtering: true           # default: true
+  fdr_level: 0.01                         # default: 0.01
+  target_n_features: 500                  # default: 500
+  top_k_per_original_feature: 20          # default: 20
+
+  # Some marker series are constant apart from floating-point noise
+  # (untracked/frozen markers). numpy >= 2.2 refuses to histogram them, which
+  # crashes tsfresh; older numpy (Colab's 2.0.x) computes features from the
+  # noise, which is what runs before Sept 2026 did.
+  #   auto  - drop them only when numpy can't process them (recommended)
+  #   true  - always drop them
+  #   false - always keep them (needs numpy < 2.2)
+  drop_degenerate_series: auto            # default: auto
+
+  # Feature extraction runs in chunks of this many files, each saved as it
+  # finishes, so an interrupted run (a Colab disconnect) resumes from the last
+  # completed chunk. Also caps peak memory, which is what exhausts Colab's RAM
+  # on the full dataset. Chunking cannot change any feature value.
+  # 0 disables it and extracts everything in one pass.
+  chunk_size: 200                         # default: 200
+
+
+# -----------------------------------------------------------------------------
+# Script 2 - Transform + feature selection tuning
+# -----------------------------------------------------------------------------
+transform_select_advanced:
+  skew_threshold: 1.0                     # default: 1.0
+  anova_p_value_threshold: 0.1            # default: 0.1
+  min_timepoints_per_animal_for_slope: 3  # default: 3
+
+
+# -----------------------------------------------------------------------------
+# Script 3 - Recovery scores
+# -----------------------------------------------------------------------------
+recovery_scores:
+  n_pcs: 10                               # default: 10
+
+  # Which of the 4 metrics to attempt. Each is still subject to the
+  # requirement checks below - this is "attempt if possible," not
+  # "force even if data can't support it."
+  metrics_requested: ["kNN", "Mahalanobis", "CKS", "Ridge"]   # default: all 4
+
+  knn:
+    k: 6                                  # default: 6
+
+
+  ridge:
+    alpha_grid: [1.0, 10.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0]  # default shown
+
+  # Minimum-sample requirements used to decide whether a metric is computable
+  # given the detected scenario. If unmet, the metric is skipped with a
+  # printed warning rather than crashing.
+  #   - baseline_min_n: required by kNN and Mahalanobis (Mahalanobis
+  #     additionally needs at least n_pcs + 1, derived automatically).
+  #   - injured_reference_min_n: required by CKS and Ridge (Ridge's
+  #     per-class CV requirement is derived from this automatically).
+  metric_requirements:
+    baseline_min_n: 3                     # default: 3
+    injured_reference_min_n: 3            # default: 3
+
+
+# -----------------------------------------------------------------------------
+# Script 4 - Visualize / analyze scores
+# -----------------------------------------------------------------------------
+visualize_scores:
+  # Colors keyed by treatment_group label. Any group not listed here gets an
+  # automatically assigned color. Ignored if treatment_group_col is null.
+  group_colors:
+    Vehicle: "#1f77b4"
+    LoDose: "#ff7f0e"
+    HiDose: "#2ca02c"
+
+  metrics_to_plot: ["CKS", "Mahalanobis", "kNN_Baseline", "Ridge"]   # default: all 4
+
+
+# -----------------------------------------------------------------------------
+# Script 5 - Visualize / analyze feature importance
+# -----------------------------------------------------------------------------
+feature_importance:
+  top_n_features: 15                      # default: 15
+  top_k_per_original_feature: 3           # default: 3
+
+
+# -----------------------------------------------------------------------------
+# Run report / logging
+# -----------------------------------------------------------------------------
+run_report:
+  output_filename: "run_report.txt"       # default: run_report.txt
