@@ -1,0 +1,17 @@
+# Data and results stay out of git. Upload the folder to Drive with them in
+# place; GitHub takes only the code.
+data/
+outputs/
+outputs_*/
+*.zip
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+
+# The animal key is small metadata, not bulk data -- keep it in git so a
+# GitHub clone is runnable on its own.
+!animal_data_key.xlsx

@@ -1,0 +1,3 @@
+# Notebooks are committed without outputs. Run once per clone:
+#   pip install nbstripout && nbstripout --install
+*.ipynb filter=nbstripout diff=ipynb

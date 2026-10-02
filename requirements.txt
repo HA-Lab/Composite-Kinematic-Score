@@ -1,0 +1,38 @@
+# Install this, locally and on Colab.
+#
+# Pins pandas 2.3 and numpy 2.0/2.1 -- the two versions the results depend on
+# -- plus the tested versions of everything else. With config.yaml's
+# drop_degenerate_series: auto, this reproduces the results the pipeline
+# produced before September 2026. requirements.txt is the current environment
+# (pandas 3, numpy 2.5); the two give slightly different results -- see
+# README.md, "Two supported environments".
+#
+# The numpy/pandas pins differ by Python version because prebuilt wheels do:
+# numpy 2.0.2 and pandas 2.3.3 have no wheels for Python 3.13, and pip would
+# try to compile them from source (very slow, usually fails on Colab). The
+# 3.13 pins are the newest versions that still behave the old way: numpy
+# < 2.2 and pandas < 3.0.
+#
+#   python3 -m venv venv && source venv/bin/activate
+#   pip install -r requirements-local.txt
+
+# These two decide the results -- don't change them without re-verifying.
+numpy==2.0.2; python_version < "3.13"    # < 2.2: keeps noise-only marker series
+numpy==2.1.3; python_version >= "3.13"
+pandas==2.3.3; python_version < "3.13"   # < 3.0: skewness check behaves as before
+# 2.2.3 rather than a 2.3.x: it is what Colab's google-colab package pins, so
+# this avoids a dependency-conflict warning, and it is already installed there.
+# Verified to give the same results as 2.3.x.
+pandas==2.2.3; python_version >= "3.13"
+
+pyarrow==25.0.1
+openpyxl==3.1.5
+PyYAML==6.0.3
+tsfresh==0.21.2
+scikit-learn==1.9.1
+scipy==1.18.1
+statsmodels==0.15.0
+shap==0.52.0
+matplotlib==3.11.2
+seaborn==0.13.2
+tqdm==4.70.1
