@@ -123,4 +123,5 @@ drops, run it again — extraction resumes from the last completed chunk.
 | `requirements.txt` | requirements; works locally and on Colab |
 | `requirements-pinnedenv.txt` | only for the optional pinned-environment mode |
 | `.gitignore` | keeps `data/` and `outputs/` out of git |
+| `scenario_types.pdf` | which recovery metrics apply to which experimental scenario |
 | `scripts/pinned_env.py` | that optional mode; off by default |
